@@ -30,13 +30,18 @@ namespace sakurai.Core.Processor
             };
         }
 
-        public Block AddBlock(string data)
+        public Block AddBlock(Blockchain blockchain, string data)
         {
+            if (blockchain.Blocks.Count > this.Chain.Blocks.Count)
+            {
+                this.Chain = blockchain;
+            }
+
             var blocks = this.Chain.Blocks;
 
             if (blocks.Count == 0)
             {
-                var lastBlock = BlockProcessor.MineBlock(BlockFactory.Genesis(), "foo");
+                var lastBlock = BlockProcessor.MineBlock(BlockFactory.Genesis(), "");
 
                 Chain.Blocks.Add(lastBlock);
             }
@@ -47,8 +52,6 @@ namespace sakurai.Core.Processor
 
                 var newBlock = BlockProcessor.MineBlock(lastBlock, data);
 
-                BlockFactory.ToStringRepresentation(newBlock);
-
                 Chain.Blocks.Add(newBlock);
             }
 
@@ -57,7 +60,20 @@ namespace sakurai.Core.Processor
 
         public bool isValidChain(Blockchain chain)
         {
-            if (chain.Blocks[0] != BlockFactory.Genesis())
+            var genesisBlock = BlockFactory.Genesis();
+            if (chain.Blocks[0].Timestamp != genesisBlock.Timestamp)
+            {
+                return false;
+            }
+            if (chain.Blocks[0].LastHash != genesisBlock.LastHash)
+            {
+                return false;
+            }
+            if (chain.Blocks[0].Hash != genesisBlock.Hash)
+            {
+                return false;
+            }
+            if (chain.Blocks[0].Data != genesisBlock.Data)
             {
                 return false;
             }
@@ -67,7 +83,8 @@ namespace sakurai.Core.Processor
                 var block = chain.Blocks[i];
                 var lastBlock = chain.Blocks[i - 1];
 
-                if (block.LastHash != lastBlock.Hash || block.Hash != BlockProcessor.BlockHash(block))
+                var blockHash = BlockProcessor.BlockHash(block);
+                if (block.LastHash != lastBlock.Hash)
                 {
                     return false;
                 }
@@ -76,7 +93,7 @@ namespace sakurai.Core.Processor
             return true;
         }
 
-        public void ReplaceChain(Blockchain newChain)
+        public Blockchain ReplaceChain(Blockchain newChain)
         {
             var blocks = this.Chain.Blocks;
 
@@ -91,6 +108,8 @@ namespace sakurai.Core.Processor
             Console.WriteLine("Replacing blockchain with the new received chain...");
 
             this.Chain = newChain;
+
+            return newChain;
         }
 
         public string ToFlatString(Blockchain blockchain)
@@ -101,7 +120,7 @@ namespace sakurai.Core.Processor
             {
                 var blockString = BlockProcessor.ToFlatString(block);
 
-                chain += blockString + "+";
+                chain += blockString + "+++";
             }
 
             return chain;

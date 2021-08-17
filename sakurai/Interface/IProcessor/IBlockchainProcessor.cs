@@ -9,11 +9,11 @@ namespace sakurai.Interface.IProcessor
 {
     public interface IBlockchainProcessor
     {
-        Block AddBlock(string data);
+        Block AddBlock(Blockchain blockchain, string data);
 
         bool isValidChain(Blockchain chain);
 
-        void ReplaceChain(Blockchain newChain);
+        Blockchain ReplaceChain(Blockchain newChain);
 
         string ToFlatString(Blockchain blockchain);
     }

@@ -36,8 +36,8 @@ namespace sakurai
             {
                 var commands = new List<string>
                 {
-                    "-join network",
-                    "-broadcast"
+                    "-activate node",
+                    "-broadcast data"
                 };
 
                 Console.WriteLine("Please choose one of the following commands:");
@@ -49,20 +49,13 @@ namespace sakurai
 
                 var input = Console.ReadLine()?.Trim();
 
-                var blo = new Blockchain
-                {
-                    Blocks = new List<Block>()
-                };
-
-                blo.Blocks.Add(BlockFactory.Genesis());
-                BlockchainProcessor.AddBlock("new block");
                 switch (input)
                 {
-                    case "-join network":
+                    case "-activate node":
                         NetworkService.ListenToPeers();
                         break;
-                    case "-broadcast":
-                        NetworkService.BroadcastToPeers(blo);
+                    case "-broadcast data":
+                        NetworkService.BroadcastData();
                         break;
                 }
 
