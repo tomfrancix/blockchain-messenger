@@ -37,7 +37,7 @@ namespace sakurai.Core.Factory
         {
             var block = new Block
             {
-                Timestamp = TimestampHelper.GetTimestamp(DateTime.UtcNow),
+                Timestamp = "202108171701528770",
                 LastHash = "--------",
                 Hash = "54kur41-f1rs7-h45h",
                 Data = ""
@@ -48,11 +48,10 @@ namespace sakurai.Core.Factory
 
         public void ToStringRepresentation(Block values)
         {
-            Console.WriteLine(" > Block : |-| Timestamp : " + values.Timestamp + "\n");
+            Console.WriteLine("\n > Block : |-| Timestamp : " + values.Timestamp);
             Console.WriteLine("           |-| Last Hash : " + values.LastHash);
             Console.WriteLine("           |-| This Hash : " + values.Hash);
             Console.WriteLine("           |-| This Data : " + values.Data);
-            Console.WriteLine("");
         }
     }
 }

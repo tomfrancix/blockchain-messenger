@@ -1,9 +1,14 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using Microsoft.Extensions.Logging;
+using sakurai.Core.Factory;
 using sakurai.Core.Processor;
+using sakurai.Interface.IFactory;
 using sakurai.Interface.IHelper;
 using sakurai.Interface.IProcessor;
 using sakurai.Interface.IService;
@@ -16,20 +21,34 @@ namespace sakurai.Core.Service
         private readonly ILogger<NetworkService> Logger;
         private readonly IObjectBytesHelper ObjectBytesHelper;
         private readonly IBlockchainProcessor BlockchainProcessor;
+        private readonly IBlockFactory BlockFactory;
 
-        public NetworkService(ILoggerFactory loggerFactory, IBlockchainProcessor blockchainProcessor)
+        private Blockchain Chain;
+
+        public NetworkService(ILoggerFactory loggerFactory, IBlockchainProcessor blockchainProcessor, IBlockFactory blockFactory)
         {
             BlockchainProcessor = blockchainProcessor;
+            BlockFactory = blockFactory;
             Logger = loggerFactory.CreateLogger<NetworkService>();
+            Chain = new Blockchain()
+            {
+                Blocks = new List<Block>()
+            };
         }
 
         public void ListenToPeers()
         {
-            Logger.LogInformation($"Connecting to server...");
+            Chain.Blocks = new List<Block> {BlockFactory.Genesis()};
+
+            Console.WriteLine("\nInitializing server...");
 
             IPHostEntry host = Dns.GetHostEntry("localhost");
             IPAddress ipAddress = host.AddressList[0];
             IPEndPoint localEndPoint = new IPEndPoint(ipAddress, 11000);
+
+            Console.WriteLine("   -| Host : " + host);
+            Console.WriteLine("   -| IP Address : " + ipAddress);
+            Console.WriteLine("   -| Endpoint : " + localEndPoint);
 
             try
             {
@@ -37,49 +56,109 @@ namespace sakurai.Core.Service
                 // Create a Socket that will use Tcp protocol      
                 Socket listener = new Socket(ipAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
 
-                // A Socket must be associated with an endpoint using the Bind method  
                 listener.Bind(localEndPoint);
 
-                // Specify how many requests a Socket can listen before it gives Server busy response.  
-                // We will listen 10 requests at a time  
-                listener.Listen(10);
+               
 
-                Console.WriteLine("Waiting for a connection...");
-                Socket handler = listener.Accept();
+                Console.WriteLine("\n   Node is ACTIVE.");
 
-                // Incoming data from the client.    
-                string data = null;
-                byte[] bytes = null;
+                var listening = true;
 
-                while (true)
+                while (listening)
                 {
-                    bytes = new byte[1024];
-                    int bytesRec = handler.Receive(bytes);
-                    data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
-                    if (data.IndexOf("<EOF>") > -1)
+                    // Specify how many requests a Socket can listen before it gives Server busy response.  
+                    // We will listen 10 requests at a time  
+                    listener.Listen(10);
+                    Console.WriteLine("\n   Waiting for a connection...");
+
+                    Socket handler = listener.Accept();
+
+                    // Incoming data from the client.    
+                    string data = null;
+                    byte[] bytes = null;
+                    var newBlockchain = new Blockchain()
+                        {
+                            Blocks = new List<Block>()
+                        };
+                    while (true)
                     {
+                        
+                        bytes = new byte[1024];
+                        int bytesRec = handler.Receive(bytes);
+                        data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
+
+                        var dataBlocks = data.Split("+++");
+                        foreach (var dataBlock in dataBlocks)
+                        {
+                            var dataBlockValues = dataBlock.Split("::");
+
+                            if (dataBlockValues.Length == 4)
+                            {
+                                var newBlock = new Block
+                                {
+                                    Timestamp = dataBlockValues[0],
+                                    LastHash = dataBlockValues[1],
+                                    Hash = dataBlockValues[2],
+                                    Data = dataBlockValues[3]
+                                };
+
+                                newBlockchain.Blocks.Add(newBlock);
+                            }
+                        }
+
                         break;
                     }
+
+                    Console.WriteLine("\nReceived blockchain:\n");
+
+                    if (newBlockchain.Blocks.Count > Chain.Blocks.Count)
+                    {
+                        if (BlockchainProcessor.isValidChain(newBlockchain))
+                        {
+                            Chain = BlockchainProcessor.ReplaceChain(newBlockchain);
+                        }
+                    }
+                    else
+                    {
+                        for (var i = 0; i < Chain.Blocks.Count; i++)
+                        {
+                            var knownData = Chain.Blocks[i];
+
+                            if (i < newBlockchain.Blocks.Count)
+                            {
+                                var newData = newBlockchain.Blocks[i];
+                                if (knownData.Timestamp == newData.Timestamp)
+                                {
+                                    continue;
+                                }
+                                else
+                                {
+                                    var newInfo = newData.Data;
+                                    BlockchainProcessor.AddBlock(Chain, newInfo);
+                                }
+                            }
+                        }
+                    }
+
+                    foreach (var block in Chain.Blocks)
+                    {
+                        BlockFactory.ToStringRepresentation(block);
+                    }
+
+                    byte[] msg = Encoding.ASCII.GetBytes(BlockchainProcessor.ToFlatString(Chain));
+                    handler.Send(msg);
                 }
-
-                Console.WriteLine("Text received : {0}", data);
-
-                byte[] msg = Encoding.ASCII.GetBytes(data);
-                handler.Send(msg);
-                handler.Shutdown(SocketShutdown.Both);
-                handler.Close();
             }
             catch (Exception e)
             {
                 Console.WriteLine(e.ToString());
             }
-
-            Console.WriteLine("\n Press any key to continue...");
-            Console.ReadKey();
         }
 
         public void BroadcastToPeers(Blockchain blockchain)
         {
+            Console.WriteLine("\n  Connecting to node...");
+
             byte[] bytes = new byte[1024];
 
             try
@@ -92,18 +171,20 @@ namespace sakurai.Core.Service
                 IPAddress ipAddress = host.AddressList[0];
                 IPEndPoint remoteEP = new IPEndPoint(ipAddress, 11000);
 
-                // Create a TCP/IP  socket.    
-                Socket sender = new Socket(ipAddress.AddressFamily,
-                    SocketType.Stream, ProtocolType.Tcp);
 
-                // Connect the socket to the remote endpoint. Catch any errors.    
+                Console.WriteLine("   -| Host : " + host);
+                Console.WriteLine("   -| IP Address : " + ipAddress);
+                Console.WriteLine("   -| Endpoint : " + remoteEP);
+
+                // Create a TCP/IP socket.    
+                Socket sender = new Socket(ipAddress.AddressFamily, SocketType.Stream, ProtocolType.Tcp);
+ 
                 try
                 {
                     // Connect to Remote EndPoint  
                     sender.Connect(remoteEP);
 
-                    Console.WriteLine("Socket connected to {0}",
-                        sender.RemoteEndPoint.ToString());
+                    Console.WriteLine("\n  Socket connected to {0}", sender.RemoteEndPoint);
 
                     // Encode the data string into a byte array.    
                     byte[] msg = Encoding.ASCII.GetBytes(BlockchainProcessor.ToFlatString(blockchain));
@@ -113,31 +194,99 @@ namespace sakurai.Core.Service
 
                     // Receive the response from the remote device.    
                     int bytesRec = sender.Receive(bytes);
-                    Console.WriteLine("Echoed test = {0}",
-                        Encoding.ASCII.GetString(bytes, 0, bytesRec));
+                    Console.WriteLine("\n  Received chain.");
+
+                    string data = null;
+                    data += Encoding.ASCII.GetString(bytes, 0, bytesRec);
+                    var newBlockchain = new Blockchain()
+                    {
+                        Blocks = new List<Block>()
+                    };
+
+                    var dataBlocks = data.Split("+++");
+                    foreach (var dataBlock in dataBlocks)
+                    {
+                        var dataBlockValues = dataBlock.Split("::");
+
+                        if (dataBlockValues.Length == 4)
+                        {
+                            var newBlock = new Block
+                            {
+                                Timestamp = dataBlockValues[0],
+                                LastHash = dataBlockValues[1],
+                                Hash = dataBlockValues[2],
+                                Data = dataBlockValues[3]
+                            };
+
+                            newBlockchain.Blocks.Add(newBlock);
+                        }
+                    }
+
+                    if (BlockchainProcessor.isValidChain(newBlockchain))
+                    {
+                        if (newBlockchain.Blocks.Count > Chain.Blocks.Count)
+                        {
+                            Console.WriteLine("\n  Found longer chain.\n");
+                            Chain = BlockchainProcessor.ReplaceChain(newBlockchain);
+                        }
+                    }
+                    
 
                     // Release the socket.    
                     sender.Shutdown(SocketShutdown.Both);
                     sender.Close();
 
+                    foreach (var block in Chain.Blocks)
+                    {
+                        BlockFactory.ToStringRepresentation(block);
+                    }
+
+                    Console.WriteLine("\n  Chain Length : " + Chain.Blocks.Count);
+
                 }
                 catch (ArgumentNullException ane)
                 {
-                    Console.WriteLine("ArgumentNullException : {0}", ane.ToString());
+                    Console.WriteLine("\nArgumentNullException : {0}", ane.ToString());
                 }
                 catch (SocketException se)
                 {
-                    Console.WriteLine("SocketException : {0}", se.ToString());
+                    Console.WriteLine("\nSocketException : {0}", se.ToString());
                 }
                 catch (Exception e)
                 {
-                    Console.WriteLine("Unexpected exception : {0}", e.ToString());
+                    Console.WriteLine("\nUnexpected exception : {0}", e.ToString());
                 }
 
             }
             catch (Exception e)
             {
                 Console.WriteLine(e.ToString());
+            }
+        }
+
+        public void StartNode()
+        {
+            Console.WriteLine("\nStarting node...");
+            ListenToPeers();
+        }
+
+        public void BroadcastData()
+        {
+            while (true)
+            {
+                Console.WriteLine("\nEnter a message...");
+                var message = Console.ReadLine();
+
+                if (Chain.Blocks.Count < 1)
+                {
+                    Chain.Blocks.Add(BlockFactory.Genesis());
+                }
+
+                BlockchainProcessor.AddBlock(Chain, message);
+
+                Console.WriteLine("\nSharing data with network...");
+
+                BroadcastToPeers(Chain);
             }
         }
     }

@@ -12,5 +12,8 @@ namespace sakurai.Interface.IService
         void ListenToPeers();
 
         void BroadcastToPeers(Blockchain blockchain);
+
+        void StartNode();
+        void BroadcastData();
     }
 }
