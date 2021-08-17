@@ -14,16 +14,16 @@ namespace sakurai
     {
         private readonly INetworkService NetworkService;
         private readonly IBlockFactory BlockFactory;
-        private readonly IBlockProcessor BlockProcessor;
+        private readonly IBlockchainProcessor BlockchainProcessor;
         private readonly ITimestampHelper TimestampHelper;
         private readonly ILogger<Sakurai> Logger;
 
-        public Sakurai(INetworkService networkService, ILoggerFactory loggerFactory, IBlockFactory blockFactory, ITimestampHelper timestampHelper, IBlockProcessor blockProcessor)
+        public Sakurai(INetworkService networkService, ILoggerFactory loggerFactory, IBlockFactory blockFactory, ITimestampHelper timestampHelper, IBlockchainProcessor blockchainProcessor)
         {
             NetworkService = networkService;
             BlockFactory = blockFactory;
             TimestampHelper = timestampHelper;
-            BlockProcessor = blockProcessor;
+            BlockchainProcessor = blockchainProcessor;
             Logger = loggerFactory.CreateLogger<Sakurai>();
         }
 
@@ -36,11 +36,8 @@ namespace sakurai
             {
                 var commands = new List<string>
                 {
-                    "-create block",
-                    "-create genesis block",
-                    "-mine block",
                     "-join network",
-                    "-view history"
+                    "-broadcast"
                 };
 
                 Console.WriteLine("Please choose one of the following commands:");
@@ -52,38 +49,25 @@ namespace sakurai
 
                 var input = Console.ReadLine()?.Trim();
 
+                var blo = new Blockchain
+                {
+                    Blocks = new List<Block>()
+                };
+
+                blo.Blocks.Add(BlockFactory.Genesis());
+                BlockchainProcessor.AddBlock("new block");
                 switch (input)
                 {
-                    case "-create block":
-                        var block = new Block
-                        {
-                            Timestamp = TimestampHelper.GetTimestamp(DateTime.Now),
-                            LastHash = "last hash",
-                            Hash = "hash",
-                            Data = "the data"
-                        };
-                        Console.WriteLine(BlockFactory.Create(block));
-                        break;
-
-                    case "-create genesis block":
-                        BlockFactory.ToStringRepresentation(BlockFactory.Genesis());
-                        break;
-
-                    case "-execute mining":
-                        BlockProcessor.ExecuteMining();
-                        break;
-
                     case "-join network":
-                        //act
+                        NetworkService.ListenToPeers();
                         break;
-                    case "-view history":
+                    case "-broadcast":
+                        NetworkService.BroadcastToPeers(blo);
                         break;
                 }
 
                 break;
             }
-
-            NetworkService.Connect();
         }
     }
 }

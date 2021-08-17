@@ -48,7 +48,7 @@ namespace sakurai.Core.Factory
 
         public void ToStringRepresentation(Block values)
         {
-            Console.WriteLine(" > Block : |-| Timestamp : " + values.Timestamp);
+            Console.WriteLine(" > Block : |-| Timestamp : " + values.Timestamp + "\n");
             Console.WriteLine("           |-| Last Hash : " + values.LastHash);
             Console.WriteLine("           |-| This Hash : " + values.Hash);
             Console.WriteLine("           |-| This Data : " + values.Data);

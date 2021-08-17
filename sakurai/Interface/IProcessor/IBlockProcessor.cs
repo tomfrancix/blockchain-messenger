@@ -9,8 +9,9 @@ namespace sakurai.Interface.IProcessor
 {
     public interface IBlockProcessor
     {
-        void ExecuteMining();
-
         Block MineBlock(Block lastBlock, string data);
+
+        string BlockHash(Block block);
+        string ToFlatString(Block block);
     }
 }

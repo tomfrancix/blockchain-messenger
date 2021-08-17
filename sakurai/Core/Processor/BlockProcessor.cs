@@ -37,20 +37,14 @@ namespace sakurai.Core.Processor
             return nextBlock;
         }
 
-        public void ExecuteMining()
+        public string BlockHash(Block block)
         {
-            var lastBlock = MineBlock(BlockFactory.Genesis(), "foo");
+            return HashFactory.GenerateHash(block.Timestamp, block.LastHash, block.Data);
+        }
 
-            for (var i = 0; i < 100; i++)
-            {
-                var newBlock = MineBlock(lastBlock, "data" + i);
-
-                BlockFactory.ToStringRepresentation(newBlock);
-
-                lastBlock = newBlock;
-            }
-
-            throw new NotImplementedException();
+        public string ToFlatString(Block block)
+        {
+            return block.Timestamp + "::" + block.LastHash + "::" + block.Hash + "::" + block.Data;
         }
     }
 }
