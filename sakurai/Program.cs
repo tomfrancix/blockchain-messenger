@@ -44,10 +44,16 @@ namespace sakurai
 
             services
                 .AddTransient<INetworkService, NetworkService>()
+
                 .AddTransient<ITimestampHelper, TimestampHelper>()
+                .AddTransient<IObjectBytesHelper, ObjectBytesHelper>()
+
                 .AddTransient<IBlockFactory, BlockFactory>()
                 .AddTransient<IHashFactory, HashFactory>()
+
                 .AddTransient<IBlockProcessor, BlockProcessor>()
+                .AddTransient<IBlockchainProcessor, BlockchainProcessor>()
+
                 .AddLogging()
                 .AddTransient<Sakurai>();
 
